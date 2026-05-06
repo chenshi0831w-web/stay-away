@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>不要过来 - 战术布局版</title>
+    <style>
+        body { background: #2f3640; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; }
+        #ui { margin: 20px; text-align: center; }
+        .grid { display: grid; grid-template-columns: repeat(10, 40px); grid-template-rows: repeat(10, 40px); gap: 2px; background: #7f8c8d; padding: 5px; border-radius: 5px; }
+        .cell { width: 40px; height: 40px; background: #ecf0f1; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #2f3640; font-weight: bold; }
+        .cell.wall { background: #c23616; color: white; } /* 路障颜色 */
+        .cell.player { background: #0097e6; border-radius: 50%; scale: 0.8; } /* 玩家位置 */
+        .cell.goal { background: #44bd32; } /* 终点 */
+        button { padding: 10px 20px; font-size: 18px; background: #44bd32; border: none; color: white; border-radius: 5px; cursor: pointer; margin-top: 20px; }
+        button:disabled { background: #7f8c8d; }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <h1>不要过来</h1>
+        <p id="msg">请在地图上放置 <span id="count">12</span> 个路障</p>
+        <div id="hpDisplay" style="display:none">剩余血量: <span id="hp">100</span></div>
+    </div>
+
+    <div class="grid" id="map"></div>
+
+    <button id="startBtn" onclick="startRun()" disabled>开始潜入</button>
+
+<script>
+    const ROWS = 10;
+    const COLS = 10;
+    const MAX_WALLS = 12;
+    let walls = [];
+    let playerPos = { r: 0, c: 0 };
+    let hp = 100;
+    let isRunning = false;
+
+    // 1. 初始化地图
+    const mapEl = document.getElementById('map');
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.dataset.r = r;
+            cell.dataset.c = c;
+            
+            // 入口和出口标记
+            if (r === 0 && c === 0) cell.classList.add('player');
+            if (r === ROWS-1 && c === COLS-1) {
+                cell.classList.add('goal');
+                cell.innerText = "终";
+            }
+
+            cell.onclick = () => toggleWall(r, c, cell);
+            mapEl.appendChild(cell);
+        }
+    }
+
+    // 2. 放置路障逻辑
+    function toggleWall(r, c, el) {
+        if (isRunning) return;
+        if ((r === 0 && c === 0) || (r === ROWS-1 && c === COLS-1)) return;
+
+        const idx = walls.findIndex(w => w.r === r && w.c === c);
+        if (idx > -1) {
+            walls.splice(idx, 1);
+            el.classList.remove('wall');
+        } else if (walls.length < MAX_WALLS) {
+            walls.push({r, c});
+            el.classList.add('wall');
+        }
+
+        document.getElementById('count').innerText = MAX_WALLS - walls.length;
+        document.getElementById('startBtn').disabled = walls.length < MAX_WALLS;
+    }
+
+    // 3. 行进逻辑（模拟对手移动）
+    async function startRun() {
+        isRunning = true;
+        document.getElementById('startBtn').style.display = 'none';
+        document.getElementById('hpDisplay').style.display = 'block';
+        document.getElementById('msg').innerText = "对手正在突进...";
+
+        while (playerPos.r < ROWS - 1 || playerPos.c < COLS - 1) {
+            // 简单的AI寻路：优先向右下走
+            if (playerPos.c < COLS - 1 && Math.random() > 0.5) {
+                playerPos.c++;
+            } else if (playerPos.r < ROWS - 1) {
+                playerPos.r++;
+            } else {
+                playerPos.c++;
+            }
+
+            // 更新视觉
+            updatePlayerVisual();
+
+            // 检查路障碰撞
+            if (walls.some(w => w.r === playerPos.r && w.c === playerPos.c)) {
+                hp -= 30; // 碰到路障扣血 
+                document.getElementById('hp').innerText = hp;
+                if (hp <= 0) {
+                    alert("路障生效！对手被拦截了。你赢了！");
+                    location.reload();
+                    return;
+                }
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 300)); // 移动速度
+        }
+
+        alert("对手到达了终点。你失败了！");
+        location.reload();
+    }
+
+    function updatePlayerVisual() {
+        document.querySelectorAll('.cell').forEach(el => el.classList.remove('player'));
+        const current = document.querySelector(`[data-r="${playerPos.r}"][data-c="${playerPos.c}"]`);
+        current.classList.add('player');
+    }
+</script>
+</body>
+</html>
